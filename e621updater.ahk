@@ -1120,9 +1120,6 @@ JsonFileStatusId := jsonstatusid.JsonContents()
 jsonstatusid_JsonContents(this) {
    return % this.id
 }
-MsgBox,36,DEBUG 1, %SyncName%
-MsgBox,36,DEBUG 2, %ArtistName%
-MsgBox,36,DEBUG 3, %JsonFileStatusId%
 RunWait, curl.exe -k -A "Keito\e621updater" -o output.txt -d login=%SyncName% -d password_hash=%ArtistName% -d id=%JsonFileStatusId% https://e621.net/favorite/create.json,,Hide,
 LV_Modify(A_Index, , Filename, extractedMD5, "Post found and favorited!")
 Done += 1 ; Image done, preparing for the next one
