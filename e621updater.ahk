@@ -1,6 +1,6 @@
-;E621 updater v9.2
+;E621 updater v9.4
 ;by (Ayo)Keito
-;Last modified 08.01.2017
+;Last modified 06.17.2019
 #SingleInstance ignore
 #Include md5.ahk
 #Include json.ahk
@@ -17,9 +17,13 @@ IfNotExist exiftool.exe
     ifMsgBox Ok
         ExitApp
 IfNotExist curl.exe
-    SyncAvailable=0
-	else
-	SyncAvailable=1
+	MsgBox,16,Critical file missing, curl.exe is missing. `nMake sure you extract all the files.`nApp will now exit.
+    ifMsgBox Ok
+        ExitApp
+;IfNotExist curl.exe
+SyncAvailable=0
+;	else
+;	SyncAvailable=1
 if A_IsCompiled
     Menu, Tray, Icon, %A_ScriptFullPath%, -159
 IfExist e621updater.ini
@@ -50,10 +54,7 @@ GuiClose(GuiHwnd) {
     MsgBox 4,Exit?, Are you sure you want to close the program?
     ifMsgBox No
         return true  ; true = 1
-	else 
-	    FileDelete %WhichFolder%\ImagesList
-		FileDelete *.json
-		ExitApp
+	else ExitApp
 }
 ;Getting folder input
 IfExist e621updater.ini
@@ -77,7 +78,7 @@ WhichFolder:=A_ScriptDir
 IniWrite, %WhichFolder%, e621updater.ini, Main, Folder
 FileDelete %WhichFolder%\ImagesList
 ;Creating windows
-Gui, Show, xCenter yCenter w410 h480, E621 updater v9.2
+Gui, Show, xCenter yCenter w410 h480, E621 updater v9.4 BETA
 Gui, Add, ListBox, Choose1 vMyListBox x10 y30 w390 r8
 Gui, Add, ListView, vFavListBox x10 y317 w390 r5 Grid NoSortHdr, ID|Rating|Size (KB)|Status
 GuiControl, Hide, FavListBox
@@ -160,7 +161,7 @@ if FromPics=0
 if FromFavs=1
     Gui, Add, Radio, Checked gWantFavs x10 y205 vFavs, Downloader mode
 if FromFavs=0
-    Gui, Add, Radio, gWantFavs x10 y205 vFavs, Downloader mode
+    Gui, Add, Radio, gWantFavs x10 y205 vFavs Disabled, Downloader mode
 If FromSync=1
     Gui, Add, Radio, Checked gWantSync x10 y225 vSync, Sync mode
 If FromSync=0
@@ -186,7 +187,7 @@ else
     MakeBackups=1
 	Gui, Add, Checkbox, Hidden Checked x150 y165 gWantBackups vMakeBackups, Backup old files
 	}
-Gui, Add, Checkbox, x150 y185 vMD, Get MD5
+Gui, Add, Checkbox, x150 y185 vMD Disabled, Get MD5
 ;Network checks checkbox
 IniRead, DisableNet, e621updater.ini, Options, NetworkChecksDisabled
 if DisableNet=ERROR
@@ -202,7 +203,7 @@ else
 	}
 Gui, Add, Checkbox, Hidden Checked x250 y205 vAlsoTag, Tag after downloading
 Gui, Add, Checkbox, gWantShutdownAfter x150 y205 vShutdownAfter, Shutdown after
-Gui, Add, Checkbox, Disabled gWantMoreInfo x250 y205 vMoreInfo, More information
+Gui, Add, Checkbox, gWantMoreInfo x250 y205 vMoreInfo, More information
 
 Gui, Add, Button, x144 y225 w76 Disabled Default, Start
 Gui, Add, Button, x220 y225 w125, Choose Another Folder
@@ -300,9 +301,12 @@ GuiControl, Disabled, Start,
 GuiControl, Disabled, Favs,
 GuiControl, Disabled, Choose Another Folder,
 GuiControl, Disabled, ShutdownAfter,
-MD5URL = http://e621.net/post/show.json?md5=
-IDURL = http://e621.net/post/show.json?id=
-FAVURL = https://e621.net/favorite/create.json?id=
+;MD5URL = https://e621.net/post/show.json?md5=
+MD5URL =
+;IDURL = https://e621.net/post/show.json?id=
+IDURL =
+;FAVURL = https://e621.net/favorite/create.json?id=
+FAVURL =
 if Tags = 1 ;User wants to tag images
 {
 FileAppend, %TimeStatus% : Tagging mode`n, after_log.txt,UTF-16
@@ -394,7 +398,8 @@ if DisableNet=0
 	netfail:
 	;Checking network in this block:
 	FileDelete mainpage.json
-	UrlDownloadToFile, http://e621.net/ , mainpage.json
+	;UrlDownloadToFile, http://e621.net/ , mainpage.json
+	RunWait, curl.exe -k -A "Keito\e621updater" -o mainpage.json https://e621.net/ -G,,Hide,
 	FileGetSize, JsonSize, mainpage.json ;If file is empty, net is not working
 	IfNotExist, mainpage.json
 	    JsonSize=0
@@ -452,11 +457,12 @@ retriesmd=0
 ;Finished checking network.
 retryaftermd:
 StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
-UrlDownloadToFile, %WORKINGURL% , working.json
+;UrlDownloadToFile, %WORKINGURL% , working.json
+RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
 FileGetSize, JsonSize, working.json ;File exist checks
 IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, skipping:
     JsonSize=0
-if JsonSize<5
+if JsonSize<2
 {
 	if (MD=1 and retriesmd=0)
 	{
@@ -618,7 +624,7 @@ if ShutdownAfter=1
 	FileAppend, %TimeStatus% : Shutting down.`n, after_log.txt,UTF-16
 	Shutdown, 13
 	}
-MsgBox,36,Finished, Finished working. Wanna close this app now?
+MsgBox,36,Finished, Finished working. Want to close this app now?
     ifMsgBox No
 	{   
 	    Gui, Destroy
@@ -661,7 +667,8 @@ if DisableNet=0
 	netfail2:
 	;Checking network in this block:
 	FileDelete mainpage.json
-	UrlDownloadToFile, http://e621.net/ , mainpage.json
+	;UrlDownloadToFile, http://e621.net/ , mainpage.json
+	RunWait, curl.exe -k -A "Keito\e621updater" -o mainpage.json https://e621.net/ -G,,Hide,
 	FileGetSize, JsonSize, mainpage.json ;If file is empty, net is not working
 	IfNotExist, mainpage.json
 	    JsonSize=0
@@ -720,7 +727,8 @@ FileDelete working.json
 JsonSize=0
 ;Finished checking network.
 StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
-UrlDownloadToFile, %WORKINGURL% , working.json
+;UrlDownloadToFile, %WORKINGURL% , working.json
+RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
 FileGetSize, JsonSize, working.json ;File exist checks
 IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, searching using MD5
     JsonSize=0
@@ -732,19 +740,22 @@ if (JsonSize<5)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-		UrlDownloadToFile, %WORKINGURL%, working.json ;Getting JSON for MD5
+		;UrlDownloadToFile, %WORKINGURL%, working.json ;Getting JSON for MD5
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.jpeg
 		pathToMD5:= Format("{1}\{2}.jpeg", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-		UrlDownloadToFile, %WORKINGURL%, working.json
+		;UrlDownloadToFile, %WORKINGURL%, working.json
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.png
 		pathToMD5:= Format("{1}\{2}.png", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-	UrlDownloadToFile, %WORKINGURL%, working.json
+	;UrlDownloadToFile, %WORKINGURL%, working.json
+	RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
 	FileGetSize, JsonSize, working.json
 	LV_Modify(A_Index, , Filename, extractedMD5, "NA, using extracted MD5")
 	IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, skipping:
@@ -813,7 +824,8 @@ if JsonFileStatus=deleted
 			LV_Modify(A_Index, , Filename, extractedMD5, "Parent post found!")
 			WORKINGURL=%IDURL%%ParentID%
 			GuiControl, , LoopFavUrl, %WORKINGURL%
-			UrlDownloadToFile, %WORKINGURL%, working.json
+			;UrlDownloadToFile, %WORKINGURL%, working.json
+			RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
 			FileRead, JsonContents, working.json
 			StringReplace, JsonContents, JsonContents, invalid URL, , All
 			jsonstatus2 := JSON.Load(JsonContents)
@@ -848,7 +860,8 @@ if JsonFileStatus=deleted
     		    return % this.file_ext
 		        }
 				DownloadedFilename=%NewFileMD5%.%NewFileExt%
-				UrlDownloadToFile, %FileURL%, %WhichFolder%\%DownloadedFilename%
+				;UrlDownloadToFile, %FileURL%, %WhichFolder%\%DownloadedFilename%
+				RunWait, curl.exe -k -A "Keito\e621updater" -o %WhichFolder%\%DownloadedFilename% %FileURL% -G,,Hide,
 				NotFoundImagesCount += 1
 				if MakeBackups=1
 				    {		
@@ -861,7 +874,8 @@ if JsonFileStatus=deleted
 				WORKINGURL=%MD5URL%%NewFileMD5%
 				GuiControl, , LoopFavUrl, %WORKINGURL%
 				StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
-				UrlDownloadToFile, %WORKINGURL% , working.json
+				;UrlDownloadToFile, %WORKINGURL% , working.json
+				RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
 				;Getting artists object from JSON
 				FileRead, JsonContents, working.json
 				jsonartistsupd := JSON.Load(JsonContents)
@@ -981,7 +995,7 @@ if ShutdownAfter=1
 	FileAppend, %TimeStatus% : Shutting down.`n, after_log.txt,UTF-16
 	Shutdown, 13
 	}
-MsgBox,36,Finished, Finished working. Wanna close this app now?
+MsgBox,36,Finished, Finished working. Want to close this app now?
     ifMsgBox No
 	{
 	    Gui, Destroy
@@ -1032,7 +1046,8 @@ FileDelete working.json
 JsonSize=0
 ;Finished checking network.
 StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
-UrlDownloadToFile, %WORKINGURL% , working.json
+;UrlDownloadToFile, %WORKINGURL% , working.json
+RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
 FileGetSize, JsonSize, working.json ;File exist checks
 IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, searching using MD5
     JsonSize=0
@@ -1044,31 +1059,36 @@ if (JsonSize<5)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-		UrlDownloadToFile, %WORKINGURL%, working.json ;Getting JSON for MD5
+		;UrlDownloadToFile, %WORKINGURL%, working.json ;Getting JSON for MD5
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.jpeg
 		pathToMD5:= Format("{1}\{2}.jpeg", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-		UrlDownloadToFile, %WORKINGURL%, working.json
+		;UrlDownloadToFile, %WORKINGURL%, working.json
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.png
 		pathToMD5:= Format("{1}\{2}.png", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-	    UrlDownloadToFile, %WORKINGURL%, working.json
+	    ;UrlDownloadToFile, %WORKINGURL%, working.json
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.swf
 		pathToMD5:= Format("{1}\{2}.swf", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-	    UrlDownloadToFile, %WORKINGURL%, working.json
+	    ;UrlDownloadToFile, %WORKINGURL%, working.json
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.webm
 		pathToMD5:= Format("{1}\{2}.webm", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-	    UrlDownloadToFile, %WORKINGURL%, working.json
+	    ;UrlDownloadToFile, %WORKINGURL%, working.json
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
 	FileGetSize, JsonSize, working.json
 	LV_Modify(A_Index, , Filename, extractedMD5, "NA, using extracted MD5")
 	IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, skipping:
@@ -1100,7 +1120,10 @@ JsonFileStatusId := jsonstatusid.JsonContents()
 jsonstatusid_JsonContents(this) {
    return % this.id
 }
-Run, curl.exe -k -A "Keito\e621updater" -d login=%SyncName% -d password_hash=%ArtistName% -d id=%JsonFileStatusId% https://e621.net/favorite/create.json,,Hide,
+MsgBox,36,DEBUG 1, %SyncName%
+MsgBox,36,DEBUG 2, %ArtistName%
+MsgBox,36,DEBUG 3, %JsonFileStatusId%
+RunWait, curl.exe -k -A "Keito\e621updater" -o output.txt -d login=%SyncName% -d password_hash=%ArtistName% -d id=%JsonFileStatusId% https://e621.net/favorite/create.json,,Hide,
 LV_Modify(A_Index, , Filename, extractedMD5, "Post found and favorited!")
 Done += 1 ; Image done, preparing for the next one
 GuiControl,, Done, %Done%/%ImagesCount%
@@ -1163,7 +1186,7 @@ if ShutdownAfter=1
 	FileAppend, %TimeStatus% : Shutting down.`n, after_log.txt,UTF-16
 	Shutdown, 13
 	}
-MsgBox,36,Finished, Finished working. Wanna close this app now?
+MsgBox,36,Finished, Finished working. Want to close this app now?
     ifMsgBox No
 	{
 	    Gui, Destroy
@@ -1216,6 +1239,7 @@ FavoritesCycle:
 page += 1
 url := Format("https://e621.net/post/index.json?limit={1}&tags=fav:{2}&page={3}", q, ArtistName, page)
 UrlDownloadToFile, % url, favorites.json
+;!!!
 FileGetSize, JsonSize, favorites.json
 IfNotExist, favorites.json
 	JsonSize=0
@@ -1318,6 +1342,7 @@ GuiControl, , LoopFavScore, %LoopFavScore%
 if WantPreview=1
 {
 UrlDownloadToFile, %LoopFavPreview%, %A_Temp%\%LoopFavName%
+;!!!
 GuiControl,, Pic, %A_Temp%\%LoopFavName%
 }
 LV_Add(, LoopFavID, LoopFavRating, LoopFavSize, "Downloading...")
@@ -1327,6 +1352,7 @@ LV_ModifyCol(3, "AutoHdr")
 LV_Modify(A_Index, "Vis")
 LV_Modify(A_Index, "Select")
 UrlDownloadToFile, %LoopFavUrl%, %WhichFolder%\%LoopFavName%
+;!!!
 NotFoundImagesCount += 1
 GuiControl,, NotFoundImagesCount, %NotFoundImagesCount%
 LV_Modify(A_Index, , LoopFavID, LoopFavRating, LoopFavSize, "Saved")
@@ -1335,6 +1361,7 @@ if AlsoTag=1
 LV_Modify(A_Index, , LoopFavID, LoopFavRating, LoopFavSize, "Saved. Tagging...")
 StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
 UrlDownloadToFile, %WORKINGURL% , working.json
+;!!!
 ;Getting artists object from JSON
 FileRead, JsonContents, working.json
 jsonartistsfav := JSON.Load(JsonContents)
@@ -1399,7 +1426,7 @@ if ShutdownAfter=1
 	FileAppend, %TimeStatus% : Shutting down.`n, after_log.txt,UTF-16
 	Shutdown, 13
 	}
-MsgBox,36,Finished, Finished working. Wanna close this app now?
+MsgBox,36,Finished, Finished working. Want to close this app now?
     ifMsgBox No
 	{   
 	    Gui, Destroy
@@ -1831,6 +1858,7 @@ GO:
 	PURL = &password=
 	apifullurl= %UURL%%APIName%%PURL%%APIPass%
     UrlDownloadToFile, %apifullurl%, api.xml
+	;!!!
 	FileRead, APIContents, api.xml
 	FileDelete api.xml
 	IfInString, APIContents, users type="array"
@@ -1855,5 +1883,4 @@ GO:
 		}
 	return
 ;@"
-;MsgBox,36,Finished, Finished working. Wanna close this app now?
-
+;MsgBox,36,Finished, Finished working. Want to close this app now?
