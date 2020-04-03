@@ -1,6 +1,6 @@
-;E621 updater v9.4
-;by (Ayo)Keito
-;Last modified 06.17.2019
+;E621 updater v9.4.1 BETA
+;by (Ayo)Keito, edited by Cheetah85
+;Last modified 03.04.2020
 #SingleInstance ignore
 #Include md5.ahk
 #Include json.ahk
@@ -158,11 +158,15 @@ if FromPics=1
     Gui, Add, Radio, Checked gWantPics x10 y185 vPictures, Updater mode
 if FromPics=0
     Gui, Add, Radio, gWantPics x10 y185 vPictures, Updater mode
+if UpdateAvailable=0
+	GuiControl, Disabled, Updater
 if FromFavs=1
     Gui, Add, Radio, Checked gWantFavs x10 y205 vFavs, Downloader mode
 if FromFavs=0
     Gui, Add, Radio, gWantFavs x10 y205 vFavs Disabled, Downloader mode
-If FromSync=1
+if DownloadAvailable=0
+	GuiControl, Disabled, Downloader
+if FromSync=1
     Gui, Add, Radio, Checked gWantSync x10 y225 vSync, Sync mode
 If FromSync=0
     Gui, Add, Radio, gWantSync x10 y225 vSync, Sync mode
@@ -301,7 +305,7 @@ GuiControl, Disabled, Start,
 GuiControl, Disabled, Favs,
 GuiControl, Disabled, Choose Another Folder,
 GuiControl, Disabled, ShutdownAfter,
-;MD5URL = https://e621.net/post/show.json?md5=
+;MD5URL = https://e621.net/posts.json?md5=
 MD5URL =
 ;IDURL = https://e621.net/post/show.json?id=
 IDURL =
@@ -321,9 +325,29 @@ Filename=
 retriesmd=0
 Retries=0
 JsonContents=
-JsonArtistFinal=
-MS=1000
 JsonTagsFinal=
+JsonTagsGeneralFinal=
+JsonTagsSpeciesFinal=
+JsonTagsCharacterFinal=
+JsonTagsCopyrightFinal=
+JsonTagsLoreFinal=
+JsonTagsMetaFinal=
+JsonMetaObject=
+JsonContentsMetaTags=
+JsonLoreObject=
+JsonContentsLoreTags=
+JsonCopyrightObject=
+JsonContentsCopyrightTags=
+JsonCharacterObject=
+JsonContentsCharacterTags=
+JsonSpeciesObject=
+JsonContentsSpeciesTags=
+JsonGeneralObject=
+JsonContentsGeneralTags=
+JsonArtistsFinal=
+JsonArtistsObject=
+JsonContentsArtists=
+MS=1000
 extractedMD5=
 ;Done
 StringTrimRight, Filename, tempstorage, 4 ;filename without extension goes to %Filename%
@@ -398,7 +422,6 @@ if DisableNet=0
 	netfail:
 	;Checking network in this block:
 	FileDelete mainpage.json
-	;UrlDownloadToFile, http://e621.net/ , mainpage.json
 	RunWait, curl.exe -k -A "Keito\e621updater" -o mainpage.json https://e621.net/ -G,,Hide,
 	FileGetSize, JsonSize, mainpage.json ;If file is empty, net is not working
 	IfNotExist, mainpage.json
@@ -457,8 +480,7 @@ retriesmd=0
 ;Finished checking network.
 retryaftermd:
 StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
-;UrlDownloadToFile, %WORKINGURL% , working.json
-RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
 FileGetSize, JsonSize, working.json ;File exist checks
 IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, skipping:
     JsonSize=0
@@ -489,35 +511,99 @@ if JsonSize<2
 }
 ;Getting artist(s) in that block:
 ;Getting artists object from JSON
-FileRead, JsonContents, working.json
-jsonartists := JSON.Load(JsonContents)
-jsonartists.JsonContents := Func("jsonartists_JsonContents")
-JsonArtistsObject := jsonartists.JsonContents()
-jsonartists_JsonContents(this) {
-   return % this.artist
+FileRead, JsonContentsArtists, working.json
+jsonartists := JSON.Load(JsonContentsArtists)
+jsonartists.JsonContentsArtists := Func("jsonartists_JsonContentsArtists")
+JsonArtistsObject := jsonartists.JsonContentsArtists()
+jsonartists_JsonContentsArtists(this) {
+   return % this.post.tags.artist
 }
 ;Parsing object into string
-MultipleArtistTemp := StrObj(JsonArtistsObject)
-JsonArtistFinal := StrObj(JsonArtistsObject)
-StringReplace, JsonArtistFinal, JsonArtistFinal, `r`n, , All
-StringTrimRight, JsonArtistFinal, JsonArtistFinal, 1
-StringReplace, JsonArtistFinal, JsonArtistFinal, conditional_dnp`,, , All ; Removing conditional_dnp from artists
-StringReplace, JsonArtistFinal, JsonArtistFinal, avoid_posting`,, , All ; Removing avoid_posting from artists
-StringReplace, JsonArtistFinal, JsonArtistFinal, unknown_artist`,, , All ; Removing unknown_artist from artists
-GuiControl,, LoopFavCount, %JsonArtistFinal% ;Finished filtering. %JsonArtistFinal% finalised.
+JsonArtistsFinal := StrObj(JsonArtistsObject)
+StringReplace, JsonArtistsFinal, JsonArtistsFinal, `r`n, , All
+StringTrimRight, JsonArtistsFinal, JsonArtistsFinal, 1
+StringReplace, JsonArtistsFinal, JsonArtistsFinal, conditional_dnp`,, , All ; Removing conditional_dnp from artists
+StringReplace, JsonArtistsFinal, JsonArtistsFinal, avoid_posting`,, , All ; Removing avoid_posting from artists
+StringReplace, JsonArtistsFinal, JsonArtistsFinal, unknown_artist`,, , All ; Removing unknown_artist from artists
+JsonArtistsFinal := StrReplace(JsonArtistsFinal, A_Space)
+JsonArtistsFinal := StrReplace(JsonArtistsFinal, "`r`n")
+JsonArtistsFinal := RegExReplace(JsonArtistsFinal, ",$")
+GuiControl,, LoopFavCount, %JsonArtistsFinal% ;Finished filtering. %JsonArtistsFinal% finalised.
 LV_Modify(A_Index, , tempstorage, "Image found, getting data")
 LV_ModifyCol(1, "AutoHdr")
 LV_ModifyCol(2, "AutoHdr")
 ;Finished getting artist(s).
-;Getting tags in this block:
-FileRead, JsonContents, working.json
-jsontags := JSON.Load(JsonContents)
-jsontags.JsonContents := Func("jsontags_JsonContents")
-JsonTagsFinal := jsontags.JsonContents()
-jsontags_JsonContents(this) {
-   return % this.tags
+
+;Getting general tags in this block:
+FileRead, JsonContentsGeneralTags, working.json
+jsontags := JSON.Load(JsonContentsGeneralTags)
+jsontags.JsonContentsGeneralTags := Func("jsontags_JsonContentsGeneralTags")
+JsonGeneralObject := jsontags.JsonContentsGeneralTags()
+jsontags_JsonContentsGeneralTags(this) {
+   return % this.post.tags.general
 }
-StringReplace, JsonTagsFinal, JsonTagsFinal, %A_SPACE%, `,, All
+;Parsing object into string
+JsonTagsGeneralFinal := StrObj(JsonGeneralObject)
+
+;Getting species tags in this block:
+FileRead, JsonContentsSpeciesTags, working.json
+jsontags := JSON.Load(JsonContentsSpeciesTags)
+jsontags.JsonContentsSpeciesTags := Func("jsontags_JsonContentsSpeciesTags")
+JsonSpeciesObject := jsontags.JsonContentsSpeciesTags()
+jsontags_JsonContentsSpeciesTags(this) {
+   return % this.post.tags.species
+}
+;Parsing object into string
+JsonTagsSpeciesFinal := StrObj(JsonSpeciesObject)
+
+;Getting character tags in this block:
+FileRead, JsonContentsCharacterTags, working.json
+jsontags := JSON.Load(JsonContentsCharacterTags)
+jsontags.JsonContentsCharacterTags := Func("jsontags_JsonContentsCharacterTags")
+JsonCharacterObject := jsontags.JsonContentsCharacterTags()
+jsontags_JsonContentsCharacterTags(this) {
+   return % this.post.tags.character
+}
+;Parsing object into string
+JsonTagsCharacterFinal := StrObj(JsonCharacterObject)
+
+;Getting copyright tags in this block:
+FileRead, JsonContentsCopyrightTags, working.json
+jsontags := JSON.Load(JsonContentsCopyrightTags)
+jsontags.JsonContentsCopyrightTags := Func("jsontags_JsonContentsCopyrightTags")
+JsonCopyrightObject := jsontags.JsonContentsCopyrightTags()
+jsontags_JsonContentsCopyrightTags(this) {
+   return % this.post.tags.copyright
+}
+;Parsing object into string
+JsonTagsCopyrightFinal := StrObj(JsonCopyrightObject)
+
+;Getting lore tags in this block:
+FileRead, JsonContentsLoreTags, working.json
+jsontags := JSON.Load(JsonContentsLoreTags)
+jsontags.JsonContentsLoreTags := Func("jsontags_JsonContentsLoreTags")
+JsonLoreObject := jsontags.JsonContentsLoreTags()
+jsontags_JsonContentsLoreTags(this) {
+   return % this.post.tags.lore
+}
+;Parsing object into string
+JsonTagsLoreFinal := StrObj(JsonLoreObject)
+
+;Getting meta tags in this block:
+FileRead, JsonContentsMetaTags, working.json
+jsontags := JSON.Load(JsonContentsMetaTags)
+jsontags.JsonContentsMetaTags := Func("jsontags_JsonContentsMetaTags")
+JsonMetaObject := jsontags.JsonContentsMetaTags()
+jsontags_JsonContentsMetaTags(this) {
+   return % this.post.tags.meta
+}
+;Parsing object into string
+JsonTagsMetaFinal := StrObj(JsonMetaObject)
+
+JsonTagsFinal := JsonTagsGeneralFinal . JsonTagsSpeciesFinal . JsonTagsCharacterFinal . JsonTagsCopyrightFinal . JsonTagsLoreFinal . JsonTagsMetaFinal
+JsonTagsFinal := StrReplace(JsonTagsFinal, A_Space)
+JsonTagsFinal := StrReplace(JsonTagsFinal, "`r`n")
+JsonTagsFinal := RegExReplace(JsonTagsFinal, ",$")
 GuiControl,, LoopFavScore, %JsonTagsFinal% ;%JsonTagsFinal% finalised.
 LV_Modify(A_Index, , tempstorage, "Data loaded, tagging...")
 LV_ModifyCol(1, "AutoHdr")
@@ -536,7 +622,7 @@ if remover=1
 ;Add tags
 IfExist %WhichFolder%\%Filename%.jpg ; To JPG
 {
-	Run, exiftool.exe -api PNGEarlyXMP -sep `, -q -P -xmp-dc:subject="%JsonTagsFinal%" -xmp-dc:creator="%JsonArtistFinal%" %WhichFolder%\%Filename%.jpg -overwrite_original_in_place, ,Hide,
+	Run, exiftool.exe -api PNGEarlyXMP -sep `, -q -P -xmp-dc:subject="%JsonTagsFinal%" -xmp-dc:creator="%JsonArtistsFinal%" %WhichFolder%\%Filename%.jpg -overwrite_original_in_place, ,Hide,
 	if (RenameAfterMD5=1 and retriesmd=0)
 	    {
 	    FileMove, %WhichFolder%\%Filename%.jpg, %newname%.jpg, 1
@@ -545,7 +631,7 @@ IfExist %WhichFolder%\%Filename%.jpg ; To JPG
 }
 IfExist %WhichFolder%\%Filename%.jpeg ; To JPEG
 {
-	Run, exiftool.exe -api PNGEarlyXMP -sep `, -q -P -xmp-dc:subject="%JsonTagsFinal%" -xmp-dc:creator="%JsonArtistFinal%" %WhichFolder%\%Filename%.jpeg -overwrite_original_in_place, ,Hide,
+	Run, exiftool.exe -api PNGEarlyXMP -sep `, -q -P -xmp-dc:subject="%JsonTagsFinal%" -xmp-dc:creator="%JsonArtistsFinal%" %WhichFolder%\%Filename%.jpeg -overwrite_original_in_place, ,Hide,
 	if (RenameAfterMD5=1 and retriesmd=0)
 	    {
 	    FileMove, %WhichFolder%\%Filename%.jpeg, %newname%.jpeg, 1
@@ -554,7 +640,7 @@ IfExist %WhichFolder%\%Filename%.jpeg ; To JPEG
 }
 IfExist %WhichFolder%\%Filename%.png ; To PNG
 {
-	Run, exiftool.exe -api PNGEarlyXMP -sep `, -q -P -xmp-dc:subject="%JsonTagsFinal%" -xmp-dc:creator="%JsonArtistFinal%" %WhichFolder%\%Filename%.png -overwrite_original_in_place, ,Hide,
+	Run, exiftool.exe -api PNGEarlyXMP -sep `, -q -P -xmp-dc:subject="%JsonTagsFinal%" -xmp-dc:creator="%JsonArtistsFinal%" %WhichFolder%\%Filename%.png -overwrite_original_in_place, ,Hide,
 	if (RenameAfterMD5=1 and retriesmd=0)
 	    {
 	    FileMove, %WhichFolder%\%Filename%.png, %newname%.png, 1
@@ -642,14 +728,34 @@ LoopReadLine := FFileList[A_Index]
 tempstorage=%LoopReadLine%
 ;Emptying variables
 Filename= 
-Retries=0
 JsonContents=
+JsonTagsFinal=
+JsonTagsGeneralFinal=
+JsonTagsSpeciesFinal=
+JsonTagsCharacterFinal=
+JsonTagsCopyrightFinal=
+JsonTagsLoreFinal=
+JsonTagsMetaFinal=
+JsonMetaObject=
+JsonContentsMetaTags=
+JsonLoreObject=
+JsonContentsLoreTags=
+JsonCopyrightObject=
+JsonContentsCopyrightTags=
+JsonCharacterObject=
+JsonContentsCharacterTags=
+JsonSpeciesObject=
+JsonContentsSpeciesTags=
+JsonGeneralObject=
+JsonContentsGeneralTags=
+JsonArtistsFinal=
+JsonArtistsObject=
+JsonContentsArtists=
+Retries=0
 MS=1000
-JsonArtistFinal=
 pathToMD5=
 JsonTagsParsed=
 JsonTagsParsedLength=0
-JsonTagsFinal=
 extractedMD5=
 ;Done
 StringTrimRight, Filename, tempstorage, 4 ;filename without extension goes to %Filename%
@@ -740,22 +846,19 @@ if (JsonSize<5)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-		;UrlDownloadToFile, %WORKINGURL%, working.json ;Getting JSON for MD5
-		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.jpeg
 		pathToMD5:= Format("{1}\{2}.jpeg", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-		;UrlDownloadToFile, %WORKINGURL%, working.json
-		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.png
 		pathToMD5:= Format("{1}\{2}.png", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%MD5URL%%extractedMD5%
-	;UrlDownloadToFile, %WORKINGURL%, working.json
-	RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+	RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
 	FileGetSize, JsonSize, working.json
 	LV_Modify(A_Index, , Filename, extractedMD5, "NA, using extracted MD5")
 	IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, skipping:
