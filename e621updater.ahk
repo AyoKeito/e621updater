@@ -5,6 +5,7 @@
 #Include md5.ahk
 #Include json.ahk
 #Include String-object-file.ahk
+Version=e621 updater v9.4.1 BETA
 preqscheck=1
 AllExt=0
 FromPics=0
@@ -20,10 +21,9 @@ IfNotExist curl.exe
 	MsgBox,16,Critical file missing, curl.exe is missing. `nMake sure you extract all the files.`nApp will now exit.
     ifMsgBox Ok
         ExitApp
-;IfNotExist curl.exe
+UpdateAvailable=0
+DownloadAvailable=0
 SyncAvailable=0
-;	else
-;	SyncAvailable=1
 if A_IsCompiled
     Menu, Tray, Icon, %A_ScriptFullPath%, -159
 IfExist e621updater.ini
@@ -78,7 +78,7 @@ WhichFolder:=A_ScriptDir
 IniWrite, %WhichFolder%, e621updater.ini, Main, Folder
 FileDelete %WhichFolder%\ImagesList
 ;Creating windows
-Gui, Show, xCenter yCenter w410 h480, E621 updater v9.4 BETA
+Gui, Show, xCenter yCenter w410 h480, %Version%
 Gui, Add, ListBox, Choose1 vMyListBox x10 y30 w390 r8
 Gui, Add, ListView, vFavListBox x10 y317 w390 r5 Grid NoSortHdr, ID|Rating|Size (KB)|Status
 GuiControl, Hide, FavListBox
@@ -1900,13 +1900,13 @@ WantMoreInfo:
     Gui, Submit, NoHide
     if MoreInfo=1
 	    {
-		Gui, Show, xCenter yCenter w573 h480, E621 updater v4
+		Gui, Show, xCenter yCenter w573 h480, %Version%
 		Gui, Submit, NoHide
 		return
 		}
 	else
 		{
-		Gui, Show, xCenter yCenter w410 h480, E621 updater v4
+		Gui, Show, xCenter yCenter w410 h480, %Version%
 		Gui, Submit, NoHide
 		return
 		}
