@@ -21,7 +21,7 @@ IfNotExist curl.exe
     ifMsgBox Ok
         ExitApp
 ;IfNotExist curl.exe
-SyncAvailable=0
+;SyncAvailable=0
 ;	else
 ;	SyncAvailable=1
 if A_IsCompiled
@@ -161,13 +161,13 @@ if FromPics=0
 if FromFavs=1
     Gui, Add, Radio, Checked gWantFavs x10 y205 vFavs, Downloader mode
 if FromFavs=0
-    Gui, Add, Radio, gWantFavs x10 y205 vFavs Disabled, Downloader mode
+    Gui, Add, Radio, gWantFavs x10 y205 vFavs, Downloader mode
 If FromSync=1
     Gui, Add, Radio, Checked gWantSync x10 y225 vSync, Sync mode
 If FromSync=0
     Gui, Add, Radio, gWantSync x10 y225 vSync, Sync mode
-If SyncAvailable=0
-    GuiControl, Disabled, Sync,
+;If SyncAvailable=0
+    ;GuiControl, Disabled, Sync,
 Gui, Add, GroupBox, x145 y145 w255 h80, Options
 Gui, Add, Checkbox, x150 y165 vRemover, Force remove old tags (compatibility)
 Gui, Add, Button, x150 y165 w76 Disabled Hidden, Get API
@@ -301,11 +301,11 @@ GuiControl, Disabled, Start,
 GuiControl, Disabled, Favs,
 GuiControl, Disabled, Choose Another Folder,
 GuiControl, Disabled, ShutdownAfter,
-;MD5URL = https://e621.net/post/show.json?md5=
+;MD5URL = https://e621.net/posts.json?md5=
 MD5URL =
-;IDURL = https://e621.net/post/show.json?id=
+;IDURL = https://e621.net/posts/
 IDURL =
-;FAVURL = https://e621.net/favorite/create.json?id=
+;FAVURL = https://e621.net/favorites.json?post_id=
 FAVURL =
 if Tags = 1 ;User wants to tag images
 {
@@ -368,7 +368,7 @@ if MD=1
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All ; Removing " if multiple artists
 		newname=%WhichFolder%\%extractedMD5%
 		StringReplace, newname, newname, `r`n,, All ; Removing " if multiple artists
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 	}
     IfExist %WhichFolder%\%Filename%.jpeg
 	{
@@ -379,7 +379,7 @@ if MD=1
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All ; Removing " if multiple artists
 		newname=%WhichFolder%\%extractedMD5%
 		StringReplace, newname, newname, `r`n,, All ; Removing " if multiple artists
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 	}
     IfExist %WhichFolder%\%Filename%.png
 	{
@@ -390,7 +390,7 @@ if MD=1
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All ; Removing " if multiple artists
 		newname=%WhichFolder%\%extractedMD5%
 		StringReplace, newname, newname, `r`n,, All ; Removing " if multiple artists
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 	}
 	}
 if DisableNet=0
@@ -458,7 +458,7 @@ retriesmd=0
 retryaftermd:
 StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
 ;UrlDownloadToFile, %WORKINGURL% , working.json
-RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
 FileGetSize, JsonSize, working.json ;File exist checks
 IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, skipping:
     JsonSize=0
@@ -494,7 +494,7 @@ jsonartists := JSON.Load(JsonContents)
 jsonartists.JsonContents := Func("jsonartists_JsonContents")
 JsonArtistsObject := jsonartists.JsonContents()
 jsonartists_JsonContents(this) {
-   return % this.artist
+   return % this.post.tags.artist
 }
 ;Parsing object into string
 MultipleArtistTemp := StrObj(JsonArtistsObject)
@@ -514,10 +514,17 @@ FileRead, JsonContents, working.json
 jsontags := JSON.Load(JsonContents)
 jsontags.JsonContents := Func("jsontags_JsonContents")
 JsonTagsFinal := jsontags.JsonContents()
+JsonTagsFinal := StrObj(JsonTagsFinal)
+StringReplace, JsonTagsFinal, JsonTagsFinal, `r`n, , All
+StringTrimRight, JsonTagsFinal, JsonTagsFinal, 1
 jsontags_JsonContents(this) {
-   return % this.tags
+   TGarray := []
+   TGarray.push(this.post.tags.general*)
+   TGarray.push(this.post.tags.species*)
+   TGarray.push(this.post.tags.character*)
+   TGarray.push(this.post.tags.copyright*)
+   return % TGarray
 }
-StringReplace, JsonTagsFinal, JsonTagsFinal, %A_SPACE%, `,, All
 GuiControl,, LoopFavScore, %JsonTagsFinal% ;%JsonTagsFinal% finalised.
 LV_Modify(A_Index, , tempstorage, "Data loaded, tagging...")
 LV_ModifyCol(1, "AutoHdr")
@@ -728,7 +735,7 @@ JsonSize=0
 ;Finished checking network.
 StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
 ;UrlDownloadToFile, %WORKINGURL% , working.json
-RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
 FileGetSize, JsonSize, working.json ;File exist checks
 IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, searching using MD5
     JsonSize=0
@@ -739,23 +746,23 @@ if (JsonSize<5)
 		pathToMD5:= Format("{1}\{2}.jpg", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 		;UrlDownloadToFile, %WORKINGURL%, working.json ;Getting JSON for MD5
-		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.jpeg
 		pathToMD5:= Format("{1}\{2}.jpeg", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 		;UrlDownloadToFile, %WORKINGURL%, working.json
-		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.png
 		pathToMD5:= Format("{1}\{2}.png", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 	;UrlDownloadToFile, %WORKINGURL%, working.json
-	RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+	RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
 	FileGetSize, JsonSize, working.json
 	LV_Modify(A_Index, , Filename, extractedMD5, "NA, using extracted MD5")
 	IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, skipping:
@@ -779,17 +786,26 @@ foundbymd5:
 GuiControl, , LoopFavScore, %extractedMD5%
 FileRead, JsonContents, working.json
 StringReplace, JsonContents, JsonContents, invalid URL, , All
+
+jsonid := JSON.Load(JsonContents)
+jsonid.JsonContents := Func("jsonid_JsonContents")
+JsonPostID := jsonid.JsonContents()
+jsonid_JsonContents(this) {
+   return % this.post.id
+}
+RunWait, curl.exe -k -A "Keito\e621updater" -o flags.json -d md5=search`%5Bpost_id`%5D=%JsonPostID% https://e621.net/post_flags.json -G,,Hide,
+FileRead, JsonContents, flags.json
 jsonstatus := JSON.Load(JsonContents)
 jsonstatus.JsonContents := Func("jsonstatus_JsonContents")
 JsonFileStatus := jsonstatus.JsonContents()
 jsonstatus_JsonContents(this) {
-   return % this.status
+   return % this.is_deletion
 }
 ;if status is "deleted"
-if JsonFileStatus=deleted
+if JsonFileStatus=true
     {
 	LV_Modify(A_Index, , Filename, extractedMD5, "Removed from e621. Getting reason...")
-	FileRead, JsonContents, working.json
+	FileRead, JsonContents, flags.json
 	GuiControl, , LoopFavName, %tempstorage%
     GuiControl, , LoopFavUrl, %WORKINGURL%
 	StringReplace, JsonContents, JsonContents, invalid URL, , All
@@ -797,7 +813,7 @@ if JsonFileStatus=deleted
 	jsonreason.JsonContents := Func("jsonreason_JsonContents")
 	JsonDeleteReason := jsonreason.JsonContents()
 	jsonreason_JsonContents(this) {
-    return % this.delreason
+    return % this.reason
     }
 	IfInString, JsonDeleteReason, takedown ;If deleted with "takedown" in reason
 	{
@@ -815,26 +831,26 @@ if JsonFileStatus=deleted
 			LV_Modify(A_Index, , Filename, extractedMD5, "Searching for parents")
 			FileRead, JsonContents, working.json
 			StringReplace, JsonContents, JsonContents, invalid URL, , All
-			jsonid := JSON.Load(JsonContents)
-			jsonid.JsonContents := Func("jsonid_JsonContents")
-			ParentID := jsonid.JsonContents()
-			jsonid_JsonContents(this) {
-    		return % this.parent_id
+			jsonpid := JSON.Load(JsonContents)
+			jsonpid.JsonContents := Func("jsonpid_JsonContents")
+			ParentID := jsonpid.JsonContents()
+			jsonpid_JsonContents(this) {
+    		return % this.post.relationships.parent_id
 		    }
 			LV_Modify(A_Index, , Filename, extractedMD5, "Parent post found!")
-			WORKINGURL=%IDURL%%ParentID%
+			WORKINGURL=%IDURL%%ParentID%.json
 			GuiControl, , LoopFavUrl, %WORKINGURL%
 			;UrlDownloadToFile, %WORKINGURL%, working.json
-			RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+			RunWait, curl.exe -k -A "Keito\e621updater" -o working.json %WORKINGURL% -G,,Hide,
 			FileRead, JsonContents, working.json
 			StringReplace, JsonContents, JsonContents, invalid URL, , All
 			jsonstatus2 := JSON.Load(JsonContents)
 			jsonstatus2.JsonContents := Func("jsonstatus2_JsonContents")
 			JsonFileStatus2 := jsonstatus2.JsonContents()
 			jsonstatus2_JsonContents(this) {
-    		return % this.status
+    		return % this.post.flags.deleted
 		    }
-			IfInString, JsonFileStatus2, active ;If parent is ACTIVE we're downloading it
+			IfInString, JsonFileStatus2, false ;If parent is ACTIVE we're downloading it
 			{
 				FileRead, JsonContents, working.json
 				StringReplace, JsonContents, JsonContents, invalid URL, , All
@@ -845,19 +861,19 @@ if JsonFileStatus=deleted
 			    JsonNewFileUrl.JsonContents := Func("JsonNewFileUrl_JsonContents")
 			    FileURL := JsonNewFileUrl.JsonContents()
 			    JsonNewFileUrl_JsonContents(this) {
-    		    return % this.file_url
+    		    return % this.post.file.url
 		        }
 				JsonNewFileMD5 := JSON.Load(JsonContents)
 			    JsonNewFileMD5.JsonContents := Func("JsonNewFileMD5_JsonContents")
 			    NewFileMD5 := JsonNewFileMD5.JsonContents()
 			    JsonNewFileMD5_JsonContents(this) {
-    		    return % this.md5
+    		    return % this.post.file.md5
 		        }
 				JsonNewFileExt := JSON.Load(JsonContents)
 			    JsonNewFileExt.JsonContents := Func("JsonNewFileExt_JsonContents")
 			    NewFileExt := JsonNewFileExt.JsonContents()
 			    JsonNewFileExt_JsonContents(this) {
-    		    return % this.file_ext
+    		    return % this.post.file.ext
 		        }
 				DownloadedFilename=%NewFileMD5%.%NewFileExt%
 				;UrlDownloadToFile, %FileURL%, %WhichFolder%\%DownloadedFilename%
@@ -871,18 +887,18 @@ if JsonFileStatus=deleted
 	    	    GuiControl,, NotFoundImagesCount, %NotFoundImagesCount%/%ImagesCount%
 				if AlsoTag=1
 				{
-				WORKINGURL=%MD5URL%%NewFileMD5%
+				WORKINGURL=%NewFileMD5%
 				GuiControl, , LoopFavUrl, %WORKINGURL%
 				StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
 				;UrlDownloadToFile, %WORKINGURL% , working.json
-				RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+				RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
 				;Getting artists object from JSON
 				FileRead, JsonContents, working.json
 				jsonartistsupd := JSON.Load(JsonContents)
 				jsonartistsupd.JsonContents := Func("jsonartistsupd_JsonContents")
 				JsonArtistsObject := jsonartistsupd.JsonContents()
 				jsonartistsupd_JsonContents(this) {
-				   return % this.artist
+				   return % this.post.artist
 				}
 				;Parsing object into string
 				MultipleArtistTemp := StrObj(JsonArtistsObject)
@@ -899,10 +915,19 @@ if JsonFileStatus=deleted
 				jsontagsupd := JSON.Load(JsonContents)
 				jsontagsupd.JsonContents := Func("jsontagsupd_JsonContents")
 				JsonTagsObject := jsontagsupd.JsonContents()
+				JsonTagsObject := StrObj(JsonTagsObject)
+				StringReplace, JsonTagsObject, JsonTagsObject, `r`n, , All
+				StringTrimRight, JsonTagsObject, JsonTagsObject, 1
 				jsontagsupd_JsonContents(this) {
-				   return % this.tags
+				   TGarray := []
+				   TGarray.push(this.post.tags.general*)
+				   TGarray.push(this.post.tags.species*)
+				   TGarray.push(this.post.tags.character*)
+				   TGarray.push(this.post.tags.copyright*)
+				   return % TGarray
+				   ;return % this.post.tags
 				}
-				StringReplace, JsonTagsObject, JsonTagsObject, %A_SPACE%, `,, All
+				;StringReplace, JsonTagsObject, JsonTagsObject, %A_SPACE%, `,, All
 				;Finished getting tags.
 				Run, exiftool.exe -api PNGEarlyXMP -sep `, -q -P -xmp-dc:subject="%JsonTagsObject%" -xmp-dc:creator="%JsonArtistFinal%" %WhichFolder%\%DownloadedFilename% -overwrite_original_in_place, ,Hide,
 				}
@@ -1047,7 +1072,7 @@ JsonSize=0
 ;Finished checking network.
 StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
 ;UrlDownloadToFile, %WORKINGURL% , working.json
-RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
 FileGetSize, JsonSize, working.json ;File exist checks
 IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, searching using MD5
     JsonSize=0
@@ -1058,37 +1083,37 @@ if (JsonSize<5)
 		pathToMD5:= Format("{1}\{2}.jpg", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 		;UrlDownloadToFile, %WORKINGURL%, working.json ;Getting JSON for MD5
-		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.jpeg
 		pathToMD5:= Format("{1}\{2}.jpeg", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 		;UrlDownloadToFile, %WORKINGURL%, working.json
-		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.png
 		pathToMD5:= Format("{1}\{2}.png", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 	    ;UrlDownloadToFile, %WORKINGURL%, working.json
-		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.swf
 		pathToMD5:= Format("{1}\{2}.swf", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 	    ;UrlDownloadToFile, %WORKINGURL%, working.json
-		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
     IfExist %WhichFolder%\%Filename%.webm
 		pathToMD5:= Format("{1}\{2}.webm", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
-		WORKINGURL=%MD5URL%%extractedMD5%
+		WORKINGURL=%extractedMD5%
 	    ;UrlDownloadToFile, %WORKINGURL%, working.json
-		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/post/show.json -G,,Hide,
+		RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
 	FileGetSize, JsonSize, working.json
 	LV_Modify(A_Index, , Filename, extractedMD5, "NA, using extracted MD5")
 	IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, skipping:
@@ -1118,9 +1143,10 @@ jsonstatusid := JSON.Load(JsonContents)
 jsonstatusid.JsonContents := Func("jsonstatusid_JsonContents")
 JsonFileStatusId := jsonstatusid.JsonContents()
 jsonstatusid_JsonContents(this) {
-   return % this.id
+   return % this.post.id
 }
-RunWait, curl.exe -k -A "Keito\e621updater" -o output.txt -d login=%SyncName% -d password_hash=%ArtistName% -d id=%JsonFileStatusId% https://e621.net/favorite/create.json,,Hide,
+;TODO fix favorite
+RunWait, curl.exe -k -A "Keito\e621updater" -o output.txt -d login=%SyncName% -d api_key=%ArtistName% -d post_id=%JsonFileStatusId% https://e621.net/favorites.json -X POST,,Hide,
 LV_Modify(A_Index, , Filename, extractedMD5, "Post found and favorited!")
 Done += 1 ; Image done, preparing for the next one
 GuiControl,, Done, %Done%/%ImagesCount%
@@ -1216,7 +1242,7 @@ totalsize = 0
 filesize = 0
 favcheck = 0
 filerating = 
-IDURL = http://e621.net/post/show.json?id=
+IDURL = https://e621.net/posts/
 favfileurls := Object()
 favfileratings := Object()
 favfilenamesfull := Object()
@@ -1234,8 +1260,9 @@ IniWrite, %ArtistName%, e621updater.ini, Downloader, Username
 SB_SetText("Getting favorites list from e621. Wait.")
 FavoritesCycle:
 page += 1
-url := Format("https://e621.net/post/index.json?limit={1}&tags=fav:{2}&page={3}", q, ArtistName, page)
-UrlDownloadToFile, % url, favorites.json
+url := Format("https://e621.net/posts.json?limit={1}&tags=fav:{2}&page={3}", q, ArtistName, page)
+;UrlDownloadToFile, % url, favorites.json
+RunWait, curl.exe -k -A "Keito\e621updater" -o favorites.json %url%,,Hide,
 ;!!!
 FileGetSize, JsonSize, favorites.json
 IfNotExist, favorites.json
@@ -1246,7 +1273,7 @@ FileRead, favorites, favorites.json
 result := JSON.Load(favorites)
 Loop,  % q
 {
-filerating = % result[A_Index].rating
+filerating = % result.posts[A_Index].rating
 IF Ex=0
 {
     If filerating=e
@@ -1268,8 +1295,8 @@ IF Sa=0
         goto SkipFileFav
     }
 }
-	favfilename = % result[A_Index].md5
-	favfileres = % result[A_Index].file_ext
+	favfilename = % result.posts[A_Index].file.md5
+	favfileres = % result.posts[A_Index].file.ext
 	favfilenamefull=%favfilename%.%favfileres%
 	StringLen, favcheck, favfilenamefull
 	if favcheck>2
@@ -1285,28 +1312,36 @@ IF Sa=0
 		    }
 	    else
 	        {
-	        favfileurls.Insert(result[A_Index].file_url)
+	        favfileurls.Insert(result.posts[A_Index].file.url)
 		    favfilenamesfull.InsertAt(favfilenamesfull.Length() + 1, favfilenamefull)
-			favids.Insert(result[A_Index].id)
-			favfileratings.Insert(result[A_Index].rating)
-			;favfilesize.Insert(result[A_Index].file_size)
-			onefilessize:= (result[A_Index].file_size / 1024)
+			favids.Insert(result.posts[A_Index].id)
+			favfileratings.Insert(result.posts[A_Index].rating)
+			;favfilesize.Insert(result.posts[A_Index].file.size)
+			onefilessize:= (result.posts[A_Index].file.size / 1024)
             onefilessize:=Round(onefilessize)
 			favfilesize.InsertAt(favfilesize.Length() + 1, onefilessize)
-			filesize = % result[A_Index].file_size
+			filesize = % result.posts[A_Index].file.size
 			totalsize += %filesize%
-			favfavcount.Insert(result[A_Index].fav_count)
-			favscore.Insert(result[A_Index].score)
+			favfavcount.Insert(result.posts[A_Index].fav_count)
+			favscore.Insert(result.posts[A_Index].score.total)
 			if WantPreview=1
 			{
-			favprevs.Insert(result[A_Index].preview_url)
+			favprevs.Insert(result.posts[A_Index].preview.url)
 			}
 			if AlsoTag=1
 			{
-			favtagslist.Insert(result[A_Index].tags)
-			favartistslist.Insert(result[A_Index].artist)
+			   TGarray := []
+			   TGarray.push(result.posts[A_Index].tags.general*)
+			   TGarray.push(result.posts[A_Index].tags.species*)
+			   TGarray.push(result.posts[A_Index].tags.character*)
+			   TGarray.push(result.posts[A_Index].tags.copyright*)
+			   TGarray := StrObj(TGarray)
+			   StringReplace, TGarray, TGarray, `r`n, , All
+			   StringTrimRight, TGarray, TGarray, 1
+			favtagslist.Insert(TGarray)
+			favartistslist.Insert(result.posts[A_Index].tags.artist)
 			}
-		    GuiControl,, FavListBox, % result[A_Index].file_url
+		    GuiControl,, FavListBox, % result.posts[A_Index].file.url
 	        Done += 1
 	        GuiControl,, Done, %Done%
 	        }
@@ -1333,12 +1368,13 @@ GuiControl, , LoopFavUrl, %LoopFavUrl%
 LoopFavCount := favfavcount[A_Index]
 LoopFavScore := favscore[A_Index]
 LoopFavPreview := favprevs[A_Index]
-WORKINGURL=%IDURL%%LoopFavID% ;Building URL
+WORKINGURL=%IDURL%%LoopFavID%.json ;Building URL
 GuiControl, , LoopFavCount, %LoopFavCount%
 GuiControl, , LoopFavScore, %LoopFavScore%
 if WantPreview=1
 {
-UrlDownloadToFile, %LoopFavPreview%, %A_Temp%\%LoopFavName%
+;UrlDownloadToFile, %LoopFavPreview%, %A_Temp%\%LoopFavName%
+RunWait, curl.exe -k -A "Keito\e621updater" -o %A_Temp%\%LoopFavName% %LoopFavPreview% -G,,Hide,
 ;!!!
 GuiControl,, Pic, %A_Temp%\%LoopFavName%
 }
@@ -1348,7 +1384,8 @@ LV_ModifyCol(2, "AutoHdr")
 LV_ModifyCol(3, "AutoHdr")
 LV_Modify(A_Index, "Vis")
 LV_Modify(A_Index, "Select")
-UrlDownloadToFile, %LoopFavUrl%, %WhichFolder%\%LoopFavName%
+;UrlDownloadToFile, %LoopFavUrl%, %WhichFolder%\%LoopFavName%
+RunWait, curl.exe -k -A "Keito\e621updater" -o %WhichFolder%\%LoopFavName% %LoopFavUrl% -G,,Hide,
 ;!!!
 NotFoundImagesCount += 1
 GuiControl,, NotFoundImagesCount, %NotFoundImagesCount%
@@ -1357,7 +1394,8 @@ if AlsoTag=1
 {
 LV_Modify(A_Index, , LoopFavID, LoopFavRating, LoopFavSize, "Saved. Tagging...")
 StringReplace, WORKINGURL, WORKINGURL, `r`n,, All
-UrlDownloadToFile, %WORKINGURL% , working.json
+;UrlDownloadToFile, %WORKINGURL% , working.json
+RunWait, curl.exe -k -A "Keito\e621updater" -o working.json %WORKINGURL% -G,,Hide,
 ;!!!
 ;Getting artists object from JSON
 FileRead, JsonContents, working.json
@@ -1365,7 +1403,7 @@ jsonartistsfav := JSON.Load(JsonContents)
 jsonartistsfav.JsonContents := Func("jsonartistsfav_JsonContents")
 JsonArtistsObject := jsonartistsfav.JsonContents()
 jsonartistsfav_JsonContents(this) {
-   return % this.artist
+   return % this.post.artist
 }
 ;Parsing object into string
 MultipleArtistTemp := StrObj(JsonArtistsObject)
@@ -1382,10 +1420,19 @@ FileRead, JsonContents, working.json
 jsontagsfav := JSON.Load(JsonContents)
 jsontagsfav.JsonContents := Func("jsontagsfav_JsonContents")
 JsonTagsObject := jsontagsfav.JsonContents()
+JsonTagsObject := StrObj(JsonTagsObject)
+StringReplace, JsonTagsObject, JsonTagsObject, `r`n, , All
+StringTrimRight, JsonTagsObject, JsonTagsObject, 1
 jsontagsfav_JsonContents(this) {
-   return % this.tags
+   TGarray := []
+   TGarray.push(this.post.tags.general*)
+   TGarray.push(this.post.tags.species*)
+   TGarray.push(this.post.tags.character*)
+   TGarray.push(this.post.tags.copyright*)
+   return % TGarray
+   ;return % this.post.tags
 }
-StringReplace, JsonTagsObject, JsonTagsObject, %A_SPACE%, `,, All
+;StringReplace, JsonTagsObject, JsonTagsObject, %A_SPACE%, `,, All
 ;Finished getting tags.
 Run, exiftool.exe -api PNGEarlyXMP -sep `, -q -P -xmp-dc:subject="%JsonTagsObject%" -xmp-dc:creator="%JsonArtistFinal%" %WhichFolder%\%LoopFavName% -overwrite_original_in_place, ,Hide,
 LV_Modify(A_Index, , LoopFavID, LoopFavRating, LoopFavSize, "Saved & tagged")
@@ -1849,12 +1896,15 @@ ButtonGetAPI:
 	return
 	
 GO:
+;TODO fix auth
     Gui, APIGet: Submit, NoHide
 	Gui, Submit, NoHide
-    UURL = http://e621.net/user/login.xml?name=
+/*    
+	UURL = https://e621.net/user/login.xml?name=
 	PURL = &password=
 	apifullurl= %UURL%%APIName%%PURL%%APIPass%
-    UrlDownloadToFile, %apifullurl%, api.xml
+    ;UrlDownloadToFile, %apifullurl%, api.xml
+	RunWait, curl.exe -k -A "Keito\e621updater" -o api.xml %apifullurl% -G,,Hide,
 	;!!!
 	FileRead, APIContents, api.xml
 	FileDelete api.xml
@@ -1879,5 +1929,90 @@ GO:
 	    MsgBox,16,Login Failed, Wrong username or password!
 		}
 	return
+*/
+RunWait, curl.exe -k -A "Keito\e621updater" -o userJSN.json https://e621.net/users/%APIName%.json -G,,Hide,
+FileRead, userJSN, userJSN.json
+IuserID := JSON.Load(userJSN).id
+FileDelete userJSN.json
+
+RunWait, curl.exe -k -A "Keito\e621updater" -c cookies.txt -o session.txt https://e621.net/session/new -G,,Hide,
+
+Fstring := "action=""/session"""
+loop, read, session.txt
+{
+	If InStr(A_LoopReadLine, Fstring)
+	{
+		loop, parse, A_LoopReadLine, %A_Space%
+		{
+			If InStr(A_LoopField, "value")
+			{
+			Fstring := A_LoopField
+			StringTrimLeft, Fstring, Fstring, 7
+			StringTrimRight, Fstring, Fstring, 1
+			token = %Fstring%
+			break
+			}
+		}
+	}
+}
+
+RunWait, curl.exe -k -A "Keito\e621updater" -c cookies.txt -b cookies.txt -F authenticity_token=%token% -F name=%APIName% -F password=%APIPass% https://e621.net/session -X POST,,Hide,
+
+RunWait, curl.exe -k -A "Keito\e621updater" -c cookies.txt -b cookies.txt -o session.txt https://e621.net/users/%IuserID%/api_key -G,,Hide,
+
+Fstring := "name=""authenticity_token"""
+loop, read, session.txt
+{
+	If InStr(A_LoopReadLine, Fstring)
+	{
+		loop, parse, A_LoopReadLine, %A_Space%
+		{
+			If InStr(A_LoopField, "value")
+			{
+			Fstring := A_LoopField
+			StringTrimLeft, Fstring, Fstring, 7
+			StringTrimRight, Fstring, Fstring, 1
+			token = %Fstring%
+			break
+			}
+		}
+	}
+}
+
+RunWait, curl.exe -k -A "Keito\e621updater" -b cookies.txt -o session.txt -F authenticity_token=%token% -F "user[password]=%APIPass%" https://e621.net/users/%IuserID%/api_key/view -X POST,,Hide,
+
+Fstring := """api-key"""
+loop, read, session.txt
+{
+	If InStr(A_LoopReadLine, Fstring)
+	{
+		GotApiKey := true
+		APIContents := A_LoopReadLine
+		StringTrimLeft, APIContents, APIContents, 33
+		StringTrimRight, APIContents, APIContents, 12
+		break
+	}
+	else
+	{
+	GotApiKey := false
+	}
+}
+FileDelete cookies.txt
+FileDelete session.txt
+if %GotApiKey%
+{
+IniWrite, %APIContents%, e621updater.ini, Downloader, API
+IniWrite, %APIName%, e621updater.ini, Downloader, Username
+SyncName=%APIName%
+ArtistName=%APIContents%
+MsgBox,64,Login Success, Logged in, API extracted. Change modes to see the changes in your GUI.
+Gui, APIGet: Destroy
+return
+}
+else
+{
+MsgBox,16,Login Failed, Wrong username or password!
+}	
+return
 ;@"
 ;MsgBox,36,Finished, Finished working. Want to close this app now?
