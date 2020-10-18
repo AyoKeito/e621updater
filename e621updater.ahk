@@ -739,9 +739,15 @@ RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% 
 FileGetSize, JsonSize, working.json ;File exist checks
 IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, searching using MD5
     JsonSize=0
-if (JsonSize<5)
+else 
+	{
+	FileRead, working, working.json
+	FLG_deleted := JSON.Load(working).post.flags.deleted
+	}
+if (JsonSize<5 or FLG_deleted=true)
     {
 	GuiControl, , LoopFavCount, Image not found on e621
+	/*
 	IfExist %WhichFolder%\%Filename%.jpg
 		pathToMD5:= Format("{1}\{2}.jpg", WhichFolder, Filename)
 	    extractedMD5:= % FileMD5( pathToMD5 )
@@ -762,8 +768,12 @@ if (JsonSize<5)
 		StringReplace, extractedMD5, extractedMD5, `r`n,, All
 		WORKINGURL=%extractedMD5%
 	;UrlDownloadToFile, %WORKINGURL%, working.json
+	*/
+	extractedMD5=%Filename%
+	WORKINGURL=%extractedMD5%
 	RunWait, curl.exe -k -A "Keito\e621updater" -o working.json -d md5=%WORKINGURL% https://e621.net/posts.json -G,,Hide,
 	FileGetSize, JsonSize, working.json
+	
 	LV_Modify(A_Index, , Filename, extractedMD5, "NA, using extracted MD5")
 	IfNotExist, working.json ;Internet is working but the JSON is empty - file not found, skipping:
         JsonSize=0
@@ -787,33 +797,28 @@ GuiControl, , LoopFavScore, %extractedMD5%
 FileRead, JsonContents, working.json
 StringReplace, JsonContents, JsonContents, invalid URL, , All
 
-jsonid := JSON.Load(JsonContents)
-jsonid.JsonContents := Func("jsonid_JsonContents")
-JsonPostID := jsonid.JsonContents()
-jsonid_JsonContents(this) {
-   return % this.post.id
-}
-RunWait, curl.exe -k -A "Keito\e621updater" -o flags.json -d md5=search`%5Bpost_id`%5D=%JsonPostID% https://e621.net/post_flags.json -G,,Hide,
-FileRead, JsonContents, flags.json
-jsonstatus := JSON.Load(JsonContents)
+JsonPostID := JSON.Load(JsonContents).post.id
+RunWait, curl.exe -k -A "Keito\e621updater" -o flags.json -d search[post_id]=%JsonPostID% https://e621.net/post_flags.json -G,,Hide,
+FileRead, flags, flags.json
+jsonstatus := JSON.Load(flags)
 jsonstatus.JsonContents := Func("jsonstatus_JsonContents")
 JsonFileStatus := jsonstatus.JsonContents()
 jsonstatus_JsonContents(this) {
-   return % this.is_deletion
+   return % this[1].is_deletion
 }
 ;if status is "deleted"
-if JsonFileStatus=true
+if (JsonFileStatus=true)
     {
 	LV_Modify(A_Index, , Filename, extractedMD5, "Removed from e621. Getting reason...")
 	FileRead, JsonContents, flags.json
 	GuiControl, , LoopFavName, %tempstorage%
     GuiControl, , LoopFavUrl, %WORKINGURL%
 	StringReplace, JsonContents, JsonContents, invalid URL, , All
-	jsonreason := JSON.Load(JsonContents)
+	jsonreason := JSON.Load(flags)
 	jsonreason.JsonContents := Func("jsonreason_JsonContents")
 	JsonDeleteReason := jsonreason.JsonContents()
 	jsonreason_JsonContents(this) {
-    return % this.reason
+    return % this[1].reason
     }
 	IfInString, JsonDeleteReason, takedown ;If deleted with "takedown" in reason
 	{
@@ -841,35 +846,35 @@ if JsonFileStatus=true
 			WORKINGURL=%IDURL%%ParentID%.json
 			GuiControl, , LoopFavUrl, %WORKINGURL%
 			;UrlDownloadToFile, %WORKINGURL%, working.json
-			RunWait, curl.exe -k -A "Keito\e621updater" -o working.json %WORKINGURL% -G,,Hide,
-			FileRead, JsonContents, working.json
-			StringReplace, JsonContents, JsonContents, invalid URL, , All
-			jsonstatus2 := JSON.Load(JsonContents)
+			RunWait, curl.exe -k -A "Keito\e621updater" -o workingP.json https://e621.net/posts/%WORKINGURL% -G,,Hide,
+			FileRead, JsonContentsP, workingP.json
+			StringReplace, JsonContentsP, JsonContentsP, invalid URL, , All
+			jsonstatus2 := JSON.Load(JsonContentsP)
 			jsonstatus2.JsonContents := Func("jsonstatus2_JsonContents")
 			JsonFileStatus2 := jsonstatus2.JsonContents()
 			jsonstatus2_JsonContents(this) {
     		return % this.post.flags.deleted
 		    }
-			IfInString, JsonFileStatus2, false ;If parent is ACTIVE we're downloading it
+			If (JsonFileStatus2=false) ;If parent is ACTIVE we're downloading it
 			{
-				FileRead, JsonContents, working.json
-				StringReplace, JsonContents, JsonContents, invalid URL, , All
+				FileRead, JsonContentsP, workingP.json
+				StringReplace, JsonContentsP, JsonContentsP, invalid URL, , All
 				LV_Modify(A_Index, , Filename, extractedMD5, "File updated.")
-				FileRead, JsonContents, working.json
-				StringReplace, JsonContents, JsonContents, invalid URL, , All
-	            JsonNewFileUrl := JSON.Load(JsonContents)
+				FileRead, JsonContentsP, workingP.json
+				StringReplace, JsonContentsP, JsonContentsP, invalid URL, , All
+	            JsonNewFileUrl := JSON.Load(JsonContentsP)
 			    JsonNewFileUrl.JsonContents := Func("JsonNewFileUrl_JsonContents")
 			    FileURL := JsonNewFileUrl.JsonContents()
 			    JsonNewFileUrl_JsonContents(this) {
     		    return % this.post.file.url
 		        }
-				JsonNewFileMD5 := JSON.Load(JsonContents)
+				JsonNewFileMD5 := JSON.Load(JsonContentsP)
 			    JsonNewFileMD5.JsonContents := Func("JsonNewFileMD5_JsonContents")
 			    NewFileMD5 := JsonNewFileMD5.JsonContents()
 			    JsonNewFileMD5_JsonContents(this) {
     		    return % this.post.file.md5
 		        }
-				JsonNewFileExt := JSON.Load(JsonContents)
+				JsonNewFileExt := JSON.Load(JsonContentsP)
 			    JsonNewFileExt.JsonContents := Func("JsonNewFileExt_JsonContents")
 			    NewFileExt := JsonNewFileExt.JsonContents()
 			    JsonNewFileExt_JsonContents(this) {
