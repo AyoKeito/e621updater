@@ -1,6 +1,6 @@
-;E621 updater v9.4
+;E621 updater v9.5
 ;by (Ayo)Keito
-;Last modified 06.17.2019
+;Last modified 18.10.2020 by Graiden
 #SingleInstance ignore
 #Include md5.ahk
 #Include json.ahk
